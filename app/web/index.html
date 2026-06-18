@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Vision Demo Console</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Smart Campus Operations Platform</p>
+          <h1>AI Vision Demo Console</h1>
+          <p class="hero-text">
+            Upload a frame from the camera team, run YOLO detection, and review
+            the stored result exactly the way your service will expose it.
+          </p>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric-card">
+            <span class="metric-label">Model</span>
+            <strong id="model-name">Loading...</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Object Source</span>
+            <strong>Uploaded file</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Mode</span>
+            <strong>Demo + API</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="panel input-panel">
+          <div class="panel-head">
+            <h2>Upload Input</h2>
+            <span class="pill">For demo on class</span>
+          </div>
+
+          <form id="detect-form" class="detect-form">
+            <label class="upload-zone" for="image">
+              <input id="image" name="image" type="file" accept="image/*" required />
+              <span class="upload-title">Choose an image</span>
+              <span class="upload-subtitle">
+                JPG, PNG, or WebP from camera snapshots
+              </span>
+            </label>
+
+            <div class="field-grid">
+              <label>
+                Camera ID
+                <input name="cameraId" type="text" value="CAM-DEMO-01" />
+              </label>
+              <label>
+                Zone ID
+                <input name="zoneId" type="text" value="DEMO-ZONE" />
+              </label>
+              <label>
+                Motion Level
+                <input
+                  name="motionLevel"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.75"
+                />
+              </label>
+              <label class="field-wide">
+                Notes
+                <input
+                  name="notes"
+                  type="text"
+                  value="Demo upload from Vision UI"
+                />
+              </label>
+            </div>
+
+            <button id="submit-button" type="submit">Run Detection</button>
+          </form>
+
+          <div class="speaker-notes">
+            <span class="result-label">Demo Script</span>
+            <p>
+              Upload an image, show the highlighted detections, then explain how
+              the same result is also available through the API contract for the
+              Camera and Core teams.
+            </p>
+          </div>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="panel-head">
+            <h2>Preview</h2>
+            <span id="status-badge" class="pill subtle">Waiting</span>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-frame">
+              <img id="preview-image" alt="Uploaded preview" hidden />
+              <canvas id="overlay-canvas" hidden></canvas>
+            </div>
+            <div id="preview-empty" class="preview-empty">
+              Your uploaded image will appear here before and after detection.
+            </div>
+            <div class="legend">
+              <span><i class="legend-swatch person"></i>Person</span>
+              <span><i class="legend-swatch unknown"></i>Other object</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel result-panel">
+          <div class="panel-head">
+            <h2>Detection Summary</h2>
+            <span class="pill accent">Live API result</span>
+          </div>
+
+          <div class="result-grid headline-grid">
+            <article class="result-card">
+              <span class="result-label">Detection ID</span>
+              <strong id="detection-id">-</strong>
+            </article>
+            <article class="result-card">
+              <span class="result-label">Risk Level</span>
+              <strong id="risk-level">-</strong>
+            </article>
+            <article class="result-card">
+              <span class="result-label">Confidence</span>
+              <strong id="confidence">-</strong>
+            </article>
+            <article class="result-card">
+              <span class="result-label">Alert Hint</span>
+              <strong id="alert-hint">-</strong>
+            </article>
+            <article class="result-card emphasis-card">
+              <span class="result-label">Detected Objects</span>
+              <strong id="object-count">0</strong>
+            </article>
+          </div>
+
+          <div class="result-layout">
+            <div class="result-column">
+              <div class="summary-box primary-summary">
+                <span class="result-label">Summary</span>
+                <p id="summary-text">No detection has been run yet.</p>
+              </div>
+
+              <div class="summary-box">
+                <span class="result-label">Objects</span>
+                <div id="objects-list" class="objects-list">
+                  <p class="empty-line">Detected objects will appear here.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="result-column side-column">
+              <div class="summary-box insight-box">
+                <span class="result-label">Detection Notes</span>
+                <ul class="insight-list">
+                  <li id="insight-status">Status: waiting for a run.</li>
+                  <li id="insight-risk">Risk classification will appear here.</li>
+                  <li id="insight-alert">Alert recommendation will appear here.</li>
+                </ul>
+              </div>
+
+              <div class="summary-box">
+                <span class="result-label">Error</span>
+                <p id="error-text">No errors.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "requestId": "REQ-CAM-20260617-0003",
+  "cameraId": "CAM-ICU-02",
+  "capturedAt": "2026-06-17T08:02:10Z",
+  "traceId": "TRACE-20260617-0003",
+  "zoneId": "ICU-HALL",
+  "motionLevel": 0.71,
+  "notes": "Re-check frame from object storage",
+  "imageSource": {
+    "sourceType": "OBJECT_STORAGE_REF",
+    "bucket": "camera-stream-cache",
+    "objectKey": "ICU-02/2026/05/12/frame-1002.jpg",
+    "expiresAt": "2099-06-17T08:12:10Z"
+  }
+}

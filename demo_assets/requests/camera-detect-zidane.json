@@ -1,0 +1,13 @@
+{
+  "requestId": "REQ-CAM-20260616-0102",
+  "cameraId": "CAM-LOBBY-02",
+  "capturedAt": "2026-06-16T13:31:00Z",
+  "traceId": "TRACE-20260616-0102",
+  "zoneId": "LOBBY-MAIN",
+  "motionLevel": 0.74,
+  "notes": "Second sample request for the camera team using IMAGE_URL",
+  "imageSource": {
+    "sourceType": "IMAGE_URL",
+    "url": "http://<CAMERA-HOST>:8000/images/zidane.jpg"
+  }
+}

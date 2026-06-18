@@ -1,0 +1,13 @@
+{
+  "requestId": "REQ-CAM-20260616-0101",
+  "cameraId": "CAM-ER-01",
+  "capturedAt": "2026-06-16T13:30:00Z",
+  "traceId": "TRACE-20260616-0101",
+  "zoneId": "ER-ENTRANCE",
+  "motionLevel": 0.91,
+  "notes": "Sample request for the camera team using IMAGE_URL",
+  "imageSource": {
+    "sourceType": "IMAGE_URL",
+    "url": "http://<CAMERA-HOST>:8000/images/bus.jpg"
+  }
+}
