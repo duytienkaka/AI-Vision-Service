@@ -426,3 +426,5 @@ Service hiện đang chạy được với:
 - giao diện demo có bounding box
 - highlight object khi hover
 - test tự động cơ bản
+#   A I - V i s i o n  
+ 
