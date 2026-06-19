@@ -11,7 +11,7 @@ from app import crud, schemas
 from app.core.auth import require_bearer_token
 from app.core.config import settings
 from app.db import get_db
-from app.integrations.core_client import send_detection_to_core
+from app.integrations.core_client import build_core_detection_notification, send_detection_to_core
 from app.services.detection_service import (
     build_identity_records,
     delete_identity,
@@ -24,6 +24,48 @@ from app.services.detection_service import (
 
 router = APIRouter()
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
+
+
+def _build_detection_snapshot(detection) -> schemas.DetectionSnapshot:
+    return schemas.DetectionSnapshot(
+        status=detection.status,
+        confidence=detection.confidence,
+        riskLevel=detection.risk_level,
+        modelVersion=detection.model_version,
+        summary=detection.summary,
+        alertHint=detection.alert_hint,
+        personDetected=detection.person_detected,
+        knownPersonDetected=detection.known_person_detected,
+        identityMatches=[
+            schemas.IdentityMatch.model_validate(item) for item in (detection.identity_matches_payload or [])
+        ],
+        completedAt=detection.completed_at,
+        thumbnailUrl=detection.thumbnail_url,
+        objects=[schemas.DetectedObject.model_validate(item) for item in detection.objects_payload],
+    )
+
+
+def _build_detection_result(detection) -> schemas.DetectionResult:
+    snapshot = _build_detection_snapshot(detection)
+    return schemas.DetectionResult(
+        detectionId=detection.detection_id,
+        requestId=detection.request_id,
+        traceId=detection.trace_id,
+        status=snapshot.status,
+        confidence=snapshot.confidence,
+        riskLevel=snapshot.riskLevel,
+        modelVersion=snapshot.modelVersion,
+        summary=snapshot.summary,
+        alertHint=snapshot.alertHint,
+        personDetected=snapshot.personDetected,
+        knownPersonDetected=snapshot.knownPersonDetected,
+        identityMatches=snapshot.identityMatches,
+        completedAt=snapshot.completedAt,
+        thumbnailUrl=snapshot.thumbnailUrl,
+        objects=snapshot.objects,
+        processedAt=detection.processed_at,
+        errorDetail=detection.error_detail,
+    )
 
 
 @router.get("/health", response_model=schemas.HealthStatus, tags=["health"])
@@ -86,7 +128,13 @@ async def demo_detect_upload(
         thumbnail_url=image_url,
     )
     crud.update_detection_result(db, detection.id, result)
-    send_detection_to_core(result)
+    notification = build_core_detection_notification(
+        result=result,
+        camera_id=cameraId,
+        captured_at=detection.captured_at,
+        zone_id=zoneId,
+    )
+    send_detection_to_core(notification)
 
     return schemas.DemoDetectionResponse(
         detectionId=detection.detection_id,
@@ -121,7 +169,13 @@ def create_detection(
     detection = crud.create_detection(db, payload)
     result = process_detection_request(detection.detection_id, payload)
     processed = crud.update_detection_result(db, detection.id, result)
-    send_detection_to_core(result)
+    notification = build_core_detection_notification(
+        result=result,
+        camera_id=detection.camera_id,
+        captured_at=detection.captured_at,
+        zone_id=detection.zone_id,
+    )
+    send_detection_to_core(notification)
 
     return schemas.DetectionSubmission(
         detectionId=detection.detection_id,
@@ -129,20 +183,7 @@ def create_detection(
         traceId=detection.trace_id,
         status="PROCESSING",
         acceptedAt=detection.accepted_at,
-        preliminaryResult=schemas.DetectionSnapshot(
-            status=processed.status,
-            confidence=processed.confidence,
-            riskLevel=processed.risk_level,
-            modelVersion=processed.model_version,
-            summary=processed.summary,
-            alertHint=processed.alert_hint,
-            completedAt=processed.completed_at,
-            thumbnailUrl=processed.thumbnail_url,
-            objects=[
-                schemas.DetectedObject.model_validate(item)
-                for item in processed.objects_payload
-            ],
-        ),
+        preliminaryResult=_build_detection_snapshot(processed),
     )
 
 
@@ -236,24 +277,7 @@ def get_detection_by_id(
             detail=f"detectionId {detectionId} does not exist",
         )
 
-    return schemas.DetectionResult(
-        detectionId=detection.detection_id,
-        requestId=detection.request_id,
-        traceId=detection.trace_id,
-        status=detection.status,
-        confidence=detection.confidence,
-        riskLevel=detection.risk_level,
-        modelVersion=detection.model_version,
-        summary=detection.summary,
-        alertHint=detection.alert_hint,
-        processedAt=detection.processed_at,
-        completedAt=detection.completed_at,
-        thumbnailUrl=detection.thumbnail_url,
-        objects=[
-            schemas.DetectedObject.model_validate(item) for item in detection.objects_payload
-        ],
-        errorDetail=detection.error_detail,
-    )
+    return _build_detection_result(detection)
 
 
 @router.get("/vision/models/info", response_model=schemas.ModelInfo, tags=["models"])

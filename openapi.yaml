@@ -1,11 +1,24 @@
 openapi: 3.1.0
 info:
   title: AI Vision Detection API
-  version: 1.0.0
+  version: 1.1.0
   description: |
-    OpenAPI contract for Pair 01 - Camera Stream -> AI Vision.
-    Camera Stream sends image references after motion is detected so AI Vision
-    can analyze the frame and return detection results for downstream services.
+    OpenAPI contract for AI Vision in the Smart Campus flow.
+
+    Main inbound flow:
+    - Camera Stream sends image references after motion is detected.
+    - AI Vision analyzes the frame and stores the detection result.
+    - Camera Stream or Core can query the result again by detectionId.
+
+    Core integration flow:
+    - AI Vision may fetch person reference data from Core for identity matching.
+    - After processing, AI Vision sends a notification payload to Core stating:
+      - whether a person is present in the frame
+      - whether the detected person matches a known identity
+      - which identity candidates were matched, if any
+
+    The existing Camera -> Vision contract remains valid. Identity-related data
+    is added as optional fields so downstream services can adopt it gradually.
   contact:
     name: Group B4
 servers:
@@ -20,6 +33,8 @@ tags:
     description: Image detection operations
   - name: models
     description: AI model capability endpoints
+  - name: core
+    description: Core integration notes and outbound notification schemas
 security:
   - bearerAuth: []
 paths:
@@ -52,6 +67,10 @@ paths:
         Camera Stream submits one frame reference or image metadata after motion
         is detected. AI Vision acknowledges the request quickly and may include
         a preliminary result if processing completes fast enough.
+
+        If person recognition is enabled in the deployment, AI Vision may also
+        query Core-managed identity data internally and enrich the detection
+        result with person presence and known-person match information.
       tags: [vision]
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
@@ -123,7 +142,11 @@ paths:
     get:
       operationId: getDetectionById
       summary: Get a detection result by ID
-      description: Returns the current or final detection result for a submitted request.
+      description: |
+        Returns the current or final detection result for a submitted request.
+
+        Core can use this endpoint when it needs to pull the full result after
+        receiving a notification from AI Vision.
       tags: [vision]
       parameters:
         - $ref: '#/components/parameters/DetectionId'
@@ -147,6 +170,13 @@ paths:
                     modelVersion: yolov11n-hospital-2.3.1
                     summary: Person detected in restricted area
                     alertHint: REVIEW_SECURITY
+                    personDetected: true
+                    knownPersonDetected: true
+                    identityMatches:
+                      - personId: PERSON-0007
+                        fullName: Nguyen Van A
+                        confidence: 0.94
+                        isKnownPerson: true
                     processedAt: '2026-05-12T08:00:01Z'
                     completedAt: '2026-05-12T08:00:02Z'
                     thumbnailUrl: https://media.hospital.local/thumbnails/DET-20260512-0001.jpg
@@ -168,6 +198,67 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+
+webhooks:
+  coreDetectionReported:
+    post:
+      summary: AI Vision sends processed detection information to Core
+      description: |
+        Outbound webhook/documentation contract for Vision -> Core integration.
+
+        When configured, AI Vision posts this payload to a Core endpoint such as:
+        `POST {CORE_SERVICE_URL}/api/v1/vision-events`
+
+        This webhook is documentation for the payload Core should be ready to
+        receive. It is not an inbound endpoint exposed by AI Vision itself.
+      tags: [core]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CoreDetectionNotification'
+            examples:
+              personKnown:
+                value:
+                  eventId: EVT-VISION-20260512-0001
+                  eventType: VISION_DETECTION_COMPLETED
+                  sentAt: '2026-05-12T08:00:03Z'
+                  detectionId: DET-20260512-0001
+                  requestId: REQ-CAM-20260512-0001
+                  traceId: TRACE-20260512-0001
+                  cameraId: CAM-ER-01
+                  zoneId: ER-ENTRANCE
+                  capturedAt: '2026-05-12T08:00:00Z'
+                  processedAt: '2026-05-12T08:00:01Z'
+                  personDetected: true
+                  knownPersonDetected: true
+                  confidence: 0.98
+                  riskLevel: HIGH
+                  summary: Person detected and matched with known profile
+                  alertHint: REVIEW_SECURITY
+                  identityMatches:
+                    - personId: PERSON-0007
+                      fullName: Nguyen Van A
+                      confidence: 0.94
+                      isKnownPerson: true
+                  objects:
+                    - objectType: PERSON
+                      label: human
+                      confidence: 0.99
+                      trackId: TRACK-77
+                      boundingBox:
+                        x: 0.12
+                        y: 0.08
+                        width: 0.41
+                        height: 0.82
+      responses:
+        '200':
+          description: Core accepted and recorded the Vision event
+        '202':
+          description: Core accepted the Vision event for asynchronous handling
 
   /vision/models/info:
     get:
@@ -448,6 +539,24 @@ components:
           enum: [REVIEW_SECURITY, MONITOR, NONE, 'null']
           description: Suggested downstream action for other services.
           example: REVIEW_SECURITY
+        personDetected:
+          type: boolean
+          description: True when at least one person is detected in the frame.
+          example: true
+        knownPersonDetected:
+          type: [boolean, 'null']
+          description: |
+            True when at least one detected person matches a known identity
+            obtained from Core-managed reference data. Null means identity
+            verification was skipped or unavailable.
+          example: true
+        identityMatches:
+          type: array
+          minItems: 0
+          maxItems: 10
+          description: Ranked identity matches for detected people, if available.
+          items:
+            $ref: '#/components/schemas/IdentityMatch'
         completedAt:
           type: [string, 'null']
           format: date-time
@@ -496,6 +605,155 @@ components:
           example: TRACK-77
         boundingBox:
           $ref: '#/components/schemas/BoundingBox'
+
+    IdentityMatch:
+      type: object
+      additionalProperties: false
+      required: [personId, confidence, isKnownPerson]
+      properties:
+        personId:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Person identifier provided by Core or identity registry.
+          example: PERSON-0007
+        fullName:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 120
+          description: Human-readable display name for the matched identity.
+          example: Nguyen Van A
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Confidence score for the identity match.
+          example: 0.94
+        isKnownPerson:
+          type: boolean
+          description: |
+            True when the matched identity belongs to a known/registered person
+            provided by Core.
+          example: true
+
+    CoreDetectionNotification:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          eventId,
+          eventType,
+          sentAt,
+          detectionId,
+          requestId,
+          traceId,
+          cameraId,
+          capturedAt,
+          processedAt,
+          personDetected,
+          knownPersonDetected,
+          confidence,
+          riskLevel,
+          summary,
+          alertHint,
+          identityMatches,
+          objects
+        ]
+      properties:
+        eventId:
+          type: string
+          pattern: '^EVT-[A-Z0-9-]+$'
+          description: Unique event identifier assigned by AI Vision.
+          example: EVT-VISION-20260512-0001
+        eventType:
+          type: string
+          enum: [VISION_DETECTION_COMPLETED, VISION_DETECTION_FAILED]
+          description: Event type sent from AI Vision to Core.
+          example: VISION_DETECTION_COMPLETED
+        sentAt:
+          type: string
+          format: date-time
+          description: Time when AI Vision sent the payload to Core.
+          example: '2026-05-12T08:00:03Z'
+        detectionId:
+          type: string
+          pattern: '^DET-[0-9]{8}-[0-9]{4}$'
+          description: Detection identifier assigned by AI Vision.
+          example: DET-20260512-0001
+        requestId:
+          type: string
+          pattern: '^REQ-[A-Z0-9-]+$'
+          description: Original request id provided by Camera Stream.
+          example: REQ-CAM-20260512-0001
+        traceId:
+          type: string
+          pattern: '^TRACE-[A-Z0-9-]+$'
+          description: End-to-end tracing identifier shared across services.
+          example: TRACE-20260512-0001
+        cameraId:
+          type: string
+          pattern: '^CAM-[A-Z0-9-]+$'
+          description: Camera identifier from the original request.
+          example: CAM-ER-01
+        zoneId:
+          type: [string, 'null']
+          minLength: 2
+          maxLength: 80
+          description: Optional zone or area where the frame was captured.
+          example: ER-ENTRANCE
+        capturedAt:
+          type: string
+          format: date-time
+          description: Original camera capture time.
+          example: '2026-05-12T08:00:00Z'
+        processedAt:
+          type: string
+          format: date-time
+          description: Time when AI Vision completed processing.
+          example: '2026-05-12T08:00:01Z'
+        personDetected:
+          type: boolean
+          description: Whether at least one person exists in the frame.
+          example: true
+        knownPersonDetected:
+          type: [boolean, 'null']
+          description: |
+            Whether any detected person matches Core reference data.
+            Null means identity verification was skipped or unavailable.
+          example: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Overall confidence score for the detection result.
+          example: 0.98
+        riskLevel:
+          $ref: '#/components/schemas/RiskLevel'
+        summary:
+          type: [string, 'null']
+          minLength: 3
+          maxLength: 300
+          description: Short human-readable summary sent to Core.
+          example: Person detected and matched with known profile
+        alertHint:
+          type: [string, 'null']
+          enum: [REVIEW_SECURITY, MONITOR, NONE, 'null']
+          description: Suggested action for Core or downstream automation.
+          example: REVIEW_SECURITY
+        identityMatches:
+          type: array
+          minItems: 0
+          maxItems: 10
+          description: Identity matches found for detected people.
+          items:
+            $ref: '#/components/schemas/IdentityMatch'
+        objects:
+          type: array
+          minItems: 0
+          maxItems: 50
+          description: Objects detected in the image, including person boxes.
+          items:
+            $ref: '#/components/schemas/DetectedObject'
 
     BoundingBox:
       type: object

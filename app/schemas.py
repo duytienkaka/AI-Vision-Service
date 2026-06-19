@@ -72,6 +72,9 @@ class DetectionSnapshot(BaseModel):
     modelVersion: str | None = Field(default=None, min_length=3, max_length=100)
     summary: str | None = Field(default=None, min_length=3, max_length=300)
     alertHint: Literal["REVIEW_SECURITY", "MONITOR", "NONE"] | None = None
+    personDetected: bool = False
+    knownPersonDetected: bool | None = None
+    identityMatches: list["IdentityMatch"] = Field(default_factory=list, max_length=10)
     completedAt: datetime | None = None
     thumbnailUrl: str | None = None
     objects: list[DetectedObject] = Field(default_factory=list, max_length=50)
@@ -92,6 +95,13 @@ class DetectionResult(DetectionSnapshot):
     traceId: str = Field(pattern=r"^TRACE-[A-Z0-9-]+$")
     processedAt: datetime | None = None
     errorDetail: str | None = Field(default=None, max_length=500)
+
+
+class IdentityMatch(BaseModel):
+    personId: str = Field(min_length=1, max_length=80)
+    fullName: str | None = Field(default=None, min_length=1, max_length=120)
+    confidence: float = Field(ge=0, le=1)
+    isKnownPerson: bool
 
 
 class ModelInfo(BaseModel):
@@ -153,6 +163,27 @@ class DemoDetectionResponse(BaseModel):
     traceId: str = Field(pattern=r"^TRACE-[A-Z0-9-]+$")
     imageUrl: str
     result: DetectionResult
+
+
+class CoreDetectionNotification(BaseModel):
+    eventId: str = Field(pattern=r"^EVT-[A-Z0-9-]+$")
+    eventType: Literal["VISION_DETECTION_COMPLETED", "VISION_DETECTION_FAILED"]
+    sentAt: datetime
+    detectionId: str = Field(pattern=r"^DET-[0-9]{8}-[0-9]{4}$")
+    requestId: str = Field(pattern=r"^REQ-[A-Z0-9-]+$")
+    traceId: str = Field(pattern=r"^TRACE-[A-Z0-9-]+$")
+    cameraId: str = Field(pattern=r"^CAM-[A-Z0-9-]+$")
+    zoneId: str | None = Field(default=None, min_length=2, max_length=80)
+    capturedAt: datetime
+    processedAt: datetime
+    personDetected: bool
+    knownPersonDetected: bool | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    riskLevel: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] | None = None
+    summary: str | None = Field(default=None, min_length=3, max_length=300)
+    alertHint: Literal["REVIEW_SECURITY", "MONITOR", "NONE"] | None = None
+    identityMatches: list[IdentityMatch] = Field(default_factory=list, max_length=10)
+    objects: list[DetectedObject] = Field(default_factory=list, max_length=50)
 
 
 class Problem(BaseModel):

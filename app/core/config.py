@@ -15,7 +15,7 @@ def _resolve_project_path(value: str) -> str:
 
 class Settings(BaseSettings):
     app_name: str = "AI Vision Detection API"
-    app_version: str = "1.0.0"
+    app_version: str = "1.1.0"
     database_url: str = "postgresql+psycopg://postgres:postgres@db:5432/ai_vision"
     api_host: str = "0.0.0.0"
     api_port: int = 8000

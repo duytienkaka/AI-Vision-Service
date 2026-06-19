@@ -53,6 +53,9 @@ def create_detection_record(
         status="PROCESSING",
         accepted_at=accepted_at,
         model_version=None,
+        person_detected=False,
+        known_person_detected=None,
+        identity_matches_payload=[],
         objects_payload=[],
     )
     db.add(detection)
@@ -89,6 +92,9 @@ def update_detection_result(
     detection.model_version = result.modelVersion
     detection.summary = result.summary
     detection.alert_hint = result.alertHint
+    detection.person_detected = result.personDetected
+    detection.known_person_detected = result.knownPersonDetected
+    detection.identity_matches_payload = [item.model_dump(mode="json") for item in result.identityMatches]
     detection.thumbnail_url = str(result.thumbnailUrl) if result.thumbnailUrl else None
     detection.objects_payload = [item.model_dump(mode="json") for item in result.objects]
     detection.error_detail = result.errorDetail

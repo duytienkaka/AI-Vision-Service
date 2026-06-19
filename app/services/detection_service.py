@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import httpx
 import numpy as np
@@ -15,11 +16,9 @@ from app.core.logging import get_logger
 os.environ.setdefault("YOLO_CONFIG_DIR", settings.yolo_config_dir)
 os.environ.setdefault("TORCH_HOME", settings.torch_home)
 
-from ultralytics import YOLO
-
 logger = get_logger(__name__)
 
-_MODEL: YOLO | None = None
+_MODEL: Any | None = None
 _COCO_TO_DOMAIN = {
     "person": "PERSON",
 }
@@ -33,9 +32,11 @@ class ObjectStorageReferenceError(ValueError):
     pass
 
 
-def _load_model() -> YOLO:
+def _load_model():
     global _MODEL
     if _MODEL is None:
+        from ultralytics import YOLO
+
         logger.info("Loading YOLO model %s", settings.yolo_model_name)
         _MODEL = YOLO(settings.yolo_model_name)
     return _MODEL
@@ -316,6 +317,9 @@ def _run_detection(
         modelVersion=settings.yolo_model_name,
         summary=summary,
         alertHint=_derive_alert_hint(risk_level),
+        personDetected=any(item.objectType == "PERSON" for item in objects),
+        knownPersonDetected=None,
+        identityMatches=[],
         processedAt=now,
         completedAt=now,
         thumbnailUrl=thumbnail_url,
@@ -323,6 +327,17 @@ def _run_detection(
         errorDetail=None,
     )
     recognized = _recognize_persons(db, image, result.objects) if db is not None else []
+    if db is not None:
+        result.knownPersonDetected = bool(recognized) if result.personDetected else False
+        result.identityMatches = [
+            schemas.IdentityMatch(
+                personId=person.displayName.upper().replace(" ", "-"),
+                fullName=person.displayName,
+                confidence=person.matchConfidence,
+                isKnownPerson=True,
+            )
+            for person in recognized
+        ]
     return result, recognized
 
 
@@ -361,6 +376,9 @@ def process_detection_request(
             modelVersion=settings.yolo_model_name,
             summary="Detection failed while processing the input image",
             alertHint="NONE",
+            personDetected=False,
+            knownPersonDetected=None,
+            identityMatches=[],
             processedAt=now,
             completedAt=now,
             thumbnailUrl=None,
@@ -401,6 +419,9 @@ def process_uploaded_image(
             modelVersion=settings.yolo_model_name,
             summary="Detection failed while processing the uploaded image",
             alertHint="NONE",
+            personDetected=False,
+            knownPersonDetected=None,
+            identityMatches=[],
             processedAt=now,
             completedAt=now,
             thumbnailUrl=None,

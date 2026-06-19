@@ -19,6 +19,9 @@ def _fake_result(detection_id: str, request_id: str, trace_id: str, thumbnail_ur
         modelVersion="yolov8n.pt",
         summary="Detected 1 object(s); top labels: person",
         alertHint="REVIEW_SECURITY",
+        personDetected=True,
+        knownPersonDetected=None,
+        identityMatches=[],
         processedAt=datetime.now(timezone.utc),
         completedAt=datetime.now(timezone.utc),
         thumbnailUrl=thumbnail_url,
@@ -95,6 +98,9 @@ def test_vision_detect_image_url_flow(client, monkeypatch):
     assert body["requestId"] == payload["requestId"]
     assert body["preliminaryResult"]["status"] == "COMPLETED"
     assert body["preliminaryResult"]["objects"][0]["objectType"] == "PERSON"
+    assert body["preliminaryResult"]["personDetected"] is True
+    assert body["preliminaryResult"]["knownPersonDetected"] is None
+    assert body["preliminaryResult"]["identityMatches"] == []
 
     detection_id = body["detectionId"]
     result_response = client.get(
@@ -105,6 +111,9 @@ def test_vision_detect_image_url_flow(client, monkeypatch):
     result_body = result_response.json()
     assert result_body["status"] == "COMPLETED"
     assert result_body["thumbnailUrl"] == "http://camera.example/frame.jpg"
+    assert result_body["personDetected"] is True
+    assert result_body["knownPersonDetected"] is None
+    assert result_body["identityMatches"] == []
 
 
 def test_vision_detect_duplicate_request_id_returns_409(client, monkeypatch):
@@ -370,6 +379,9 @@ def test_vision_detect_timeout_returns_failed_result(client, monkeypatch):
             modelVersion="yolov8n.pt",
             summary="Detection failed while processing the input image",
             alertHint="NONE",
+            personDetected=False,
+            knownPersonDetected=None,
+            identityMatches=[],
             processedAt=datetime.now(timezone.utc),
             completedAt=datetime.now(timezone.utc),
             thumbnailUrl=None,
@@ -398,6 +410,7 @@ def test_vision_detect_timeout_returns_failed_result(client, monkeypatch):
     assert response.status_code == 202
     body = response.json()
     assert body["preliminaryResult"]["status"] == "FAILED"
+    assert body["preliminaryResult"]["personDetected"] is False
     assert body["preliminaryResult"]["objects"] == []
 
 
