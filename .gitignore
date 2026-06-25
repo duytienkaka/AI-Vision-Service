@@ -20,3 +20,4 @@ yolov8n.pt
 bus-demo.jpg
 
 main.py
+!app/main.py

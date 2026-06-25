@@ -1,430 +1,308 @@
-# AI Vision Service
+# AI Vision Service 🔥
 
-AI Vision Service là service nhận diện đối tượng cho nền tảng Smart Campus. Service này nhận đầu vào ảnh từ nhóm Camera, chạy YOLO để suy luận, lưu kết quả vào PostgreSQL, và có thể gửi tiếp dữ liệu đã xử lý sang service Core nếu được cấu hình.
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](./openapi.yaml)
+[![License](https://img.shields.io/badge/License-Not%20specified-lightgrey)](#bản-quyền-và-giấy-phép)
 
-## Service Này Dùng Để Làm Gì
+AI Vision Service là dịch vụ nhận diện đối tượng dành cho nền tảng Smart Campus. Dịch vụ nhận ảnh từ Camera, chạy YOLO, lưu kết quả vào PostgreSQL và có thể gửi sự kiện nhận diện sang Core Service.
 
-- Nhận yêu cầu nhận diện từ service Camera
-- Lấy ảnh từ `IMAGE_URL` và chạy phát hiện đối tượng
-- Lưu metadata và danh sách đối tượng phát hiện được vào PostgreSQL
-- Cung cấp API để nhóm Camera và Core lấy kết quả
-- Cung cấp giao diện demo để thuyết trình và kiểm thử nhanh
+Dự án cung cấp REST API, tài liệu OpenAPI và giao diện web để demo trực tiếp bằng ảnh tải lên.
 
-## Công Nghệ Sử Dụng
+## Điều kiện tiên quyết
 
-- `FastAPI`
-- `PostgreSQL`
-- `SQLAlchemy`
-- `Ultralytics YOLO`
-- `Docker Compose`
+Cách chạy khuyến nghị là Docker:
 
-## Luồng Tích Hợp Chính
+- Git
+- Docker Desktop có Docker Compose
+- Kết nối Internet trong lần build và lần đầu tải model `yolov8n.pt`
+- Tối thiểu khoảng 4 GB dung lượng trống cho image, dependency và model
 
-### Camera -> Vision
+Nếu chạy trực tiếp không qua Docker, máy cần thêm:
 
-1. Nhóm Camera gọi `POST /vision/detect`
-2. Camera gửi metadata và nguồn ảnh
-3. Vision lấy ảnh từ `IMAGE_URL`
-4. Vision chạy YOLO để phát hiện đối tượng
-5. Vision lưu kết quả vào PostgreSQL
-6. Vision trả về `detectionId`
-7. Camera hoặc Core có thể gọi `GET /vision/detections/{detectionId}` để lấy lại kết quả
+- Python 3.12 64-bit
+- PostgreSQL 16
 
-### Vision -> Core
+## Cài đặt
 
-Nếu có cấu hình `CORE_SERVICE_URL`, Vision sẽ gửi kết quả đã xử lý tới:
+### Chạy bằng Docker
 
-```text
-POST <CORE_SERVICE_URL>/api/v1/detections
-```
+1. Clone dự án:
 
-Trong môi trường Docker Compose của dự án này, đã có sẵn `mock-core` để mô phỏng service Core, giúp demo được luôn luồng Vision gọi sang Core ngay cả khi nhóm Core chưa kết nối trực tiếp.
+   ```bash
+   git clone https://github.com/duytienkaka/AI-Vision-Service.git
+   cd AI-Vision-Service
+   ```
 
-### Luồng Demo
+2. Tạo file cấu hình môi trường:
 
-1. Mở `http://localhost:8000/demo`
-2. Tải ảnh trực tiếp từ máy lên
-3. Vision chạy YOLO để nhận diện
-4. Giao diện sẽ hiển thị:
-   - ảnh xem trước
-   - bounding box
-   - danh sách đối tượng
-   - hiệu ứng highlight từng đối tượng khi rê chuột
-   - summary, confidence và alert hint
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-### Nguồn Ảnh Được Hỗ Trợ
+   Trên Linux hoặc macOS:
 
-Service hiện hỗ trợ 2 cách đưa ảnh vào API chính:
+   ```bash
+   cp .env.example .env
+   ```
 
-- `IMAGE_URL`: nhóm Camera truyền vào một URL ảnh mà máy chạy Vision truy cập được
-- `OBJECT_STORAGE_REF`: nhóm Camera truyền `bucket`, `objectKey`, `expiresAt`; Vision sẽ đọc ảnh từ thư mục object storage đã cấu hình
+3. Build và khởi động API cùng PostgreSQL:
 
-API upload ảnh trực tiếp chỉ dùng cho demo giao diện web, không phải contract chính giữa các nhóm.
+   ```bash
+   docker compose up --build -d
+   ```
 
-## Danh Sách API Hiện Có
+4. Kiểm tra trạng thái:
 
-### `GET /health`
+   ```bash
+   docker compose ps
+   curl http://localhost:8000/health
+   ```
 
-API kiểm tra trạng thái service.
+5. Dừng hệ thống khi không sử dụng:
 
-- Xác thực: không cần
-- Mục đích: kiểm tra service còn hoạt động hay không
+   ```bash
+   docker compose down
+   ```
 
-Ví dụ response:
+   Thêm `-v` nếu muốn xóa cả dữ liệu PostgreSQL:
 
-```json
-{
-  "status": "ok",
-  "service": "ai-vision",
-  "time": "2026-06-16T14:19:51.893140Z"
-}
-```
+   ```bash
+   docker compose down -v
+   ```
 
-### `POST /vision/detect`
+### Chạy trực tiếp bằng Python
 
-API chính để nhóm Camera tích hợp.
+1. Tạo virtual environment:
 
-- Xác thực: bắt buộc
-- Header: `Authorization: Bearer <token>`
-- Content-Type: `application/json`
-- Kiểu nguồn ảnh khuyến nghị: `IMAGE_URL`
-- Ngoài ra cũng hỗ trợ `OBJECT_STORAGE_REF`
+   ```powershell
+   py -3.12 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
 
-Ví dụ request:
+2. Cài dependency:
 
-```json
-{
-  "requestId": "REQ-CAM-20260616-9101",
-  "cameraId": "CAM-ER-01",
-  "capturedAt": "2026-06-16T14:20:00Z",
-  "traceId": "TRACE-20260616-9101",
-  "zoneId": "ER-ENTRANCE",
-  "motionLevel": 0.91,
-  "notes": "Camera integration request",
-  "imageSource": {
-    "sourceType": "IMAGE_URL",
-    "url": "http://<CAMERA-HOST>:8000/images/zidane.jpg"
-  }
-}
-```
+   ```powershell
+   python -m pip install --upgrade pip
+   pip install -r requirements-dev.txt
+   ```
 
-Ví dụ response:
+3. Tạo `.env` và đổi hostname PostgreSQL từ `db` thành `localhost`:
 
-```json
-{
-  "detectionId": "DET-20260616-2697",
-  "requestId": "REQ-CAM-20260616-9101",
-  "traceId": "TRACE-20260616-9101",
-  "status": "PROCESSING",
-  "acceptedAt": "2026-06-16T14:20:09.244167Z",
-  "preliminaryResult": {
-    "status": "COMPLETED",
-    "confidence": 0.8055675029754639,
-    "riskLevel": "HIGH",
-    "modelVersion": "yolov8n.pt",
-    "summary": "Detected 3 object(s); top labels: person, person, tie",
-    "alertHint": "REVIEW_SECURITY",
-    "completedAt": "2026-06-16T14:20:09.318032Z",
-    "thumbnailUrl": "http://<CAMERA-HOST>:8000/images/zidane.jpg",
-    "objects": [
-      {
-        "objectType": "PERSON",
-        "label": "person",
-        "confidence": 0.8055675029754639,
-        "trackId": "TRACK-1",
-        "boundingBox": {
-          "x": 0.0964,
-          "y": 0.2739,
-          "width": 0.7712,
-          "height": 0.713
-        }
-      }
-    ]
-  }
-}
-```
+   ```env
+   DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/ai_vision
+   ```
 
-Lưu ý:
+4. Khởi động API:
 
-- Đây là contract chính khuyến nghị cho nhóm Camera.
-- `requestId` phải là duy nhất. Nếu gửi trùng sẽ nhận `409 Conflict`.
-- `OBJECT_STORAGE_REF` đã được hỗ trợ cho luồng object storage nội bộ.
+   ```powershell
+   python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
 
-### `GET /vision/detections/{detectionId}`
+## Cách sử dụng
 
-API lấy lại kết quả nhận diện đã được lưu.
+Sau khi khởi động, các địa chỉ chính là:
 
-- Xác thực: bắt buộc
-- Header: `Authorization: Bearer <token>`
+| Chức năng | Địa chỉ |
+| --- | --- |
+| Kiểm tra service | <http://localhost:8000/health> |
+| Swagger UI | <http://localhost:8000/docs> |
+| Giao diện demo | <http://localhost:8000/demo> |
+| OpenAPI contract | [openapi.yaml](./openapi.yaml) |
 
-Ví dụ response:
+### Demo nhận diện ảnh 🖼️
 
-```json
-{
-  "detectionId": "DET-20260616-2697",
-  "requestId": "REQ-CAM-20260616-9101",
-  "traceId": "TRACE-20260616-9101",
-  "status": "COMPLETED",
-  "confidence": 0.8055675029754639,
-  "riskLevel": "HIGH",
-  "modelVersion": "yolov8n.pt",
-  "summary": "Detected 3 object(s); top labels: person, person, tie",
-  "alertHint": "REVIEW_SECURITY",
-  "processedAt": "2026-06-16T14:20:09.318032Z",
-  "completedAt": "2026-06-16T14:20:09.318032Z",
-  "thumbnailUrl": "http://<CAMERA-HOST>:8000/images/zidane.jpg",
-  "objects": [
-    {
-      "objectType": "PERSON",
-      "label": "person",
-      "confidence": 0.8055675029754639,
-      "trackId": "TRACK-1",
-      "boundingBox": {
-        "x": 0.0964,
-        "y": 0.2739,
-        "width": 0.7712,
-        "height": 0.713
-      }
-    }
-  ],
-  "errorDetail": null
-}
-```
+1. Mở <http://localhost:8000/demo>.
+2. Chọn một ảnh trong [`demo_assets/images`](./demo_assets/images).
+3. Nhấn nút nhận diện.
+4. Xem bounding box, nhãn đối tượng, confidence và mức độ rủi ro.
 
-### `GET /vision/models/info`
+Các kịch bản trình diễn có sẵn tại [demo-scenarios.md](./demo_assets/demo-scenarios.md).
 
-API trả về thông tin model đang dùng.
+### Camera gửi ảnh sang Vision
 
-- Xác thực: bắt buộc
-- Header: `Authorization: Bearer <token>`
-
-Thông tin trả về gồm:
-
-- phiên bản model YOLO đang chạy
-- các loại đối tượng được hỗ trợ
-- các loại nguồn ảnh được hỗ trợ
-- kích thước ảnh tối đa
-
-### `POST /demo/api/detect`
-
-API chỉ dùng cho phần demo giao diện web.
-
-- Xác thực: không cần
-- Content-Type: `multipart/form-data`
-
-Các field chính:
-
-- `image`
-- `cameraId`
-- `zoneId`
-- `motionLevel`
-- `notes`
-
-Kết quả trả về:
-
-- `detectionId`
-- `requestId`
-- `traceId`
-- `imageUrl`
-- `result`
-
-### `GET /demo`
-
-Giao diện demo để test thủ công và trình bày.
-
-- Xác thực: không cần
-
-### `GET /demo-assets/...`
-
-API phục vụ ảnh và dữ liệu demo tĩnh.
-
-- Xác thực: không cần
-
-API này hữu ích để mô phỏng `IMAGE_URL` khi test tích hợp Camera -> Vision.
-
-## Cơ Chế Xác Thực
-
-Các API cần Bearer token hiện tại gồm:
-
-- `POST /vision/detect`
-- `GET /vision/detections/{detectionId}`
-- `GET /vision/models/info`
-
-Ví dụ header:
+Các endpoint tích hợp yêu cầu header:
 
 ```text
 Authorization: Bearer demo-token
 ```
 
-## Cách Chạy Service
-
-### Chạy Bằng Docker
-
-1. Sao chép `.env.example` thành `.env`
-2. Khởi động toàn bộ stack:
+Ví dụ gửi ảnh qua `IMAGE_URL`:
 
 ```bash
-docker compose up --build
+curl -X POST http://localhost:8000/vision/detect \
+  -H "Authorization: Bearer demo-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requestId": "REQ-CAM-20260625-0001",
+    "cameraId": "CAM-ER-01",
+    "capturedAt": "2026-06-25T08:00:00Z",
+    "traceId": "TRACE-20260625-0001",
+    "zoneId": "ER-ENTRANCE",
+    "motionLevel": 0.91,
+    "imageSource": {
+      "sourceType": "IMAGE_URL",
+      "url": "http://host.docker.internal:8000/demo-assets/images/bus.jpg"
+    }
+  }'
 ```
 
-Sau đó mở:
+Payload mẫu đầy đủ nằm trong [`demo_assets/requests`](./demo_assets/requests).
 
-- API root: `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-- Demo UI: `http://localhost:8000/demo`
-- Demo assets: `http://localhost:8000/demo-assets/`
-- Mock Core health: `http://localhost:8010/health`
-- Mock Core latest detection: `http://localhost:8010/api/v1/detections/latest`
-
-### Chạy Local Với Python
+### Lấy lại kết quả nhận diện
 
 ```bash
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
-
-## Biến Môi Trường
-
-Các biến chính trong `.env`:
-
-- `DATABASE_URL`: chuỗi kết nối PostgreSQL
-- `CORE_SERVICE_URL`: địa chỉ base URL của service Core
-- `CORE_SERVICE_TIMEOUT_SECONDS`: thời gian chờ khi Vision gọi sang Core
-- `YOLO_MODEL_NAME`: model YOLO đang dùng, ví dụ `yolov8n.pt`
-- `IMAGE_FETCH_TIMEOUT_SECONDS`: thời gian chờ khi tải ảnh từ `IMAGE_URL`
-- `MAX_IMAGE_SIZE_BYTES`: kích thước ảnh tối đa được chấp nhận
-- `YOLO_CONFIG_DIR`: thư mục cache và cấu hình của Ultralytics
-- `TORCH_HOME`: thư mục cache của Torch
-- `UPLOADS_DIR`: thư mục lưu ảnh upload từ giao diện demo
-- `OBJECT_STORAGE_ROOT`: thư mục gốc mô phỏng object storage cho `OBJECT_STORAGE_REF`
-- `DEMO_TITLE`: tiêu đề hiển thị trên trang demo
-
-## Ví Dụ Sử Dụng Nhanh
-
-### Kiểm Tra Health
-
-```bash
-curl http://localhost:8000/health
-```
-
-### Camera Gọi Sang Vision
-
-```bash
-curl -X POST http://localhost:8000/vision/detect ^
-  -H "Content-Type: application/json" ^
-  -H "Authorization: Bearer demo-token" ^
-  -d "{\"requestId\":\"REQ-CAM-001\",\"cameraId\":\"CAM-01\",\"capturedAt\":\"2026-06-16T14:20:00Z\",\"traceId\":\"TRACE-001\",\"zoneId\":\"ER-01\",\"motionLevel\":0.9,\"notes\":\"demo\",\"imageSource\":{\"sourceType\":\"IMAGE_URL\",\"url\":\"http://host.docker.internal:8000/demo-assets/images/bus.jpg\"}}"
-```
-
-### Lấy Kết Quả Nhận Diện
-
-```bash
-curl http://localhost:8000/vision/detections/DET-20260616-2697 ^
+curl http://localhost:8000/vision/detections/DET-20260625-0001 \
   -H "Authorization: Bearer demo-token"
 ```
 
-## Ghi Chú Tích Hợp Cho Nhóm Camera
+Thay `DET-20260625-0001` bằng `detectionId` trả về từ `POST /vision/detect`.
 
-Cách làm khuyến nghị cho nhóm Camera:
+### Tích hợp Vision với Core
 
-- dùng `POST /vision/detect`
-- gửi `imageSource.sourceType = IMAGE_URL`
-- cung cấp ảnh qua một URL HTTP có thể truy cập được
-- đảm bảo máy chạy Vision có thể truy cập URL đó qua mạng
+Đặt URL Core trong `.env`:
 
-Nếu nhóm Camera muốn mô phỏng object storage thay vì URL, có thể dùng:
-
-- `imageSource.sourceType = OBJECT_STORAGE_REF`
-- `bucket`
-- `objectKey`
-- `expiresAt`
-
-Ví dụ URL ảnh:
-
-```text
-http://<camera-host>:8000/images/bus.jpg
+```env
+CORE_SERVICE_URL=http://core-service:8010
 ```
 
-Các payload mẫu đã chuẩn bị:
-
-- [camera-detect-bus.json](/d:/AI_Vision_Service/demo_assets/requests/camera-detect-bus.json:1)
-- [camera-detect-zidane.json](/d:/AI_Vision_Service/demo_assets/requests/camera-detect-zidane.json:1)
-- [camera-detect-object-storage.json](/d:/AI_Vision_Service/demo_assets/requests/camera-detect-object-storage.json:1)
-
-## Ghi Chú Tích Hợp Cho Nhóm Core
-
-Nếu có cấu hình `CORE_SERVICE_URL`, Vision sẽ gửi kết quả nhận diện tới:
+Sau khi xử lý ảnh, Vision gửi:
 
 ```text
-POST <CORE_SERVICE_URL>/api/v1/detections
+POST {CORE_SERVICE_URL}/api/v1/vision-events
 ```
 
-Nhóm Core cần có endpoint nhận payload kết quả do Vision gửi sang.
+Payload sử dụng schema `CoreDetectionNotification`, gồm trạng thái nhận diện, camera, người được phát hiện, identity match và danh sách đối tượng. Contract chi tiết được khai báo tại phần `webhooks` trong [openapi.yaml](./openapi.yaml).
 
-Trong Docker Compose hiện tại, service `mock-core` đã đóng vai trò endpoint mẫu để:
+Nếu `CORE_SERVICE_URL` để trống, quá trình nhận diện vẫn hoạt động nhưng bước gửi sang Core sẽ được bỏ qua.
 
-- xác minh Vision gọi outbound thành công
-- kiểm tra payload Vision gửi sang Core
-- demo tích hợp ngay cả khi chưa nối sang Core thật
+### Nhận diện danh tính
 
-## Tài Nguyên Demo
+Các API hiện có:
 
-Các ảnh mẫu đã chuẩn bị:
+- `POST /vision/identify`: đối chiếu người trong ảnh với danh tính đã đăng ký.
+- `POST /vision/identities/register`: đăng ký hoặc bổ sung ảnh tham chiếu.
+- `GET /vision/identities`: lấy danh sách danh tính.
+- `DELETE /vision/identities/{personCode}`: xóa danh tính.
 
-- [bus.jpg](/d:/AI_Vision_Service/demo_assets/images/bus.jpg)
-- [zidane.jpg](/d:/AI_Vision_Service/demo_assets/images/zidane.jpg)
-- [person-crop.jpg](/d:/AI_Vision_Service/demo_assets/images/person-crop.jpg)
+Chi tiết request và response được hiển thị trong Swagger UI.
 
-Kịch bản demo gợi ý:
-
-- [demo-scenarios.md](/d:/AI_Vision_Service/demo_assets/demo-scenarios.md:1)
-
-## Kiểm Thử
-
-### Chạy Test Tự Động
+### Chạy kiểm thử
 
 ```bash
-.venv\Scripts\python -m pytest -q
+docker compose exec api pip install -r requirements-dev.txt
+docker compose exec api python -m pytest -q
 ```
 
-Phạm vi test cơ bản hiện có:
+Nếu đang chạy bằng virtual environment:
 
-- `GET /health`
-- kiểm tra auth cho `POST /vision/detect`
-- luồng nhận diện bằng `IMAGE_URL`
-- luồng nhận diện bằng `OBJECT_STORAGE_REF`
-- lỗi trùng `requestId`
-- lỗi `404` và lỗi validation schema
-- luồng upload ảnh cho giao diện demo
+```powershell
+python -m pytest -q
+```
 
-### Kiểm Thử Thủ Công
+### Xem log
 
-1. Mở `http://localhost:8000/demo`
-2. Tải lên `bus.jpg` hoặc `zidane.jpg`
-3. Kiểm tra bounding box trên ảnh
-4. Rê chuột vào từng object trong danh sách để xem highlight
-5. Gọi `POST /vision/detect` bằng payload mẫu của Camera
-6. Gọi `GET /vision/detections/{detectionId}`
+```bash
+docker compose logs -f api
+docker compose logs -f db
+```
 
-Checklist kiểm thử:
+## Cấu hình
 
-- [basic-verification.md](/d:/AI_Vision_Service/reports/basic-verification.md:1)
+Các biến môi trường quan trọng:
 
-## Giới Hạn Hiện Tại
+| Biến | Ý nghĩa | Mặc định |
+| --- | --- | --- |
+| `DATABASE_URL` | Chuỗi kết nối PostgreSQL | PostgreSQL service `db` |
+| `CORE_SERVICE_URL` | Base URL của Core Service | Để trống |
+| `CORE_SERVICE_TIMEOUT_SECONDS` | Timeout khi gửi sự kiện sang Core | `5.0` |
+| `YOLO_MODEL_NAME` | Model Ultralytics YOLO | `yolov8n.pt` |
+| `IMAGE_FETCH_TIMEOUT_SECONDS` | Timeout tải ảnh từ URL | `15.0` |
+| `MAX_IMAGE_SIZE_BYTES` | Kích thước ảnh tối đa | `5242880` |
+| `IDENTITY_MATCH_THRESHOLD` | Ngưỡng khớp danh tính | `0.92` |
+| `UPLOADS_DIR` | Nơi lưu ảnh upload demo | `storage/uploads` |
+| `OBJECT_STORAGE_ROOT` | Object storage mô phỏng | `storage/object_store` |
+| `IDENTITY_GALLERY_DIR` | Nơi lưu ảnh tham chiếu | `storage/identity_gallery` |
 
-- Luồng tích hợp chính vẫn ưu tiên `IMAGE_URL` vì dễ tích hợp nhất với nhóm Camera
-- `OBJECT_STORAGE_REF` hiện đang dùng thư mục object storage mô phỏng cục bộ; nếu triển khai thật cần nối sang MinIO, S3 hoặc storage dùng chung
-- Luồng Vision -> Core cần URL thật của Core để test end-to-end hoàn chỉnh
+Xem toàn bộ cấu hình tại [.env.example](./.env.example).
 
-## Trạng Thái Hiện Tại
+## Cấu trúc dự án
 
-Service hiện đang chạy được với:
+```text
+AI-Vision-Service/
+├── app/
+│   ├── api/                  # REST API routes
+│   ├── core/                 # Cấu hình, auth và logging
+│   ├── integrations/         # Tích hợp outbound với Core
+│   ├── services/             # YOLO và identity processing
+│   ├── web/                  # Giao diện demo
+│   └── main.py               # FastAPI entrypoint
+├── demo_assets/              # Ảnh, request và kịch bản demo
+├── tests/                    # Automated tests
+├── openapi.yaml              # Contract Camera, Vision và Core
+├── Dockerfile
+└── docker-compose.yml
+```
 
-- FastAPI server
-- PostgreSQL
-- Docker
-- YOLO inference thật
-- giao diện demo có bounding box
-- highlight object khi hover
-- test tự động cơ bản
-#   A I - V i s i o n  
- 
+## Làm thế nào để đóng góp
+
+1. Fork repository.
+2. Tạo branch từ `main`:
+
+   ```bash
+   git checkout -b feature/ten-tinh-nang
+   ```
+
+3. Cài dependency phát triển và chạy test trước khi sửa.
+4. Thực hiện thay đổi nhỏ, rõ mục tiêu và bổ sung test tương ứng.
+5. Chạy:
+
+   ```bash
+   python -m pytest -q
+   ```
+
+6. Commit với nội dung mô tả rõ thay đổi:
+
+   ```bash
+   git commit -m "Add: mô tả ngắn tính năng"
+   ```
+
+7. Push branch và tạo pull request về `main`.
+
+Không commit `.env`, database, model tải về, cache hoặc dữ liệu trong thư mục `storage/`.
+
+## Tác giả và contributors
+
+- **duytienkaka** — phát triển và duy trì dự án
+  GitHub: [@duytienkaka](https://github.com/duytienkaka)
+
+Danh sách contributor được xác định từ lịch sử Git. Khi có thêm thành viên đóng góp đáng kể, hãy bổ sung họ vào mục này.
+
+## Nguồn và lời cảm ơn
+
+Dự án sử dụng các công nghệ và tài nguyên mã nguồn mở:
+
+- [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) cho nhận diện đối tượng.
+- [PyTorch](https://pytorch.org/) làm nền tảng suy luận machine learning.
+- [FastAPI](https://fastapi.tiangolo.com/) cho REST API.
+- [SQLAlchemy](https://www.sqlalchemy.org/) và [PostgreSQL](https://www.postgresql.org/) cho tầng lưu trữ.
+- Ảnh demo `bus.jpg` và `zidane.jpg` được phân phối cùng hệ sinh thái ví dụ của Ultralytics.
+- Badges được tạo bởi [Shields.io](https://shields.io/).
+
+Việc sử dụng lại các dependency và tài nguyên phải tuân theo giấy phép riêng của từng dự án nguồn.
+
+## Thông tin liên lạc
+
+- GitHub: <https://github.com/duytienkaka>
+- Email: <duytienkaka123az@gmail.com>
+- Issues: <https://github.com/duytienkaka/AI-Vision-Service/issues>
+
+Vui lòng dùng GitHub Issues cho báo lỗi, đề xuất tính năng hoặc thảo luận kỹ thuật để thông tin có thể được theo dõi công khai.
+
+## Bản quyền và giấy phép
+
+Repository hiện chưa có file `LICENSE`, vì vậy chưa có giấy phép nguồn mở nào được công bố. Theo mặc định, tác giả giữ toàn bộ quyền đối với mã nguồn.
+
+Nếu dự án cần được sử dụng, phân phối hoặc tích hợp bên ngoài phạm vi nhóm, hãy liên hệ tác giả và bổ sung giấy phép phù hợp. Có thể tham khảo [Choose a License](https://choosealicense.com/) hoặc [Open Source Initiative](https://opensource.org/licenses).

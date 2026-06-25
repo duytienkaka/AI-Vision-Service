@@ -199,6 +199,44 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /vision/models/info:
+    get:
+      operationId: getModelInfo
+      summary: Get active model information
+      description: Returns the model version and supported input capabilities.
+      tags: [models]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Active model information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelInfo'
+              examples:
+                activeModel:
+                  value:
+                    modelName: yolo-hospital-monitor
+                    modelVersion: yolov11n-hospital-2.3.1
+                    supportedObjectTypes:
+                      - PERSON
+                      - WHEELCHAIR
+                      - STRETCHER
+                      - SMOKE
+                    supportedImageSourceTypes:
+                      - IMAGE_URL
+                      - OBJECT_STORAGE_REF
+                    maxImageSizeBytes: 5242880
+                    notes: Tuned for indoor hospital corridor and entrance cameras
+                    lastUpdatedAt: '2026-05-01T00:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
 webhooks:
   coreDetectionReported:
     post:
@@ -259,44 +297,6 @@ webhooks:
           description: Core accepted and recorded the Vision event
         '202':
           description: Core accepted the Vision event for asynchronous handling
-
-  /vision/models/info:
-    get:
-      operationId: getModelInfo
-      summary: Get active model information
-      description: Returns the model version and supported input capabilities.
-      tags: [models]
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      responses:
-        '200':
-          description: Active model information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelInfo'
-              examples:
-                activeModel:
-                  value:
-                    modelName: yolo-hospital-monitor
-                    modelVersion: yolov11n-hospital-2.3.1
-                    supportedObjectTypes:
-                      - PERSON
-                      - WHEELCHAIR
-                      - STRETCHER
-                      - SMOKE
-                    supportedImageSourceTypes:
-                      - IMAGE_URL
-                      - OBJECT_STORAGE_REF
-                    maxImageSizeBytes: 5242880
-                    notes: Tuned for indoor hospital corridor and entrance cameras
-                    lastUpdatedAt: '2026-05-01T00:00:00Z'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 
 components:
   securitySchemes:
