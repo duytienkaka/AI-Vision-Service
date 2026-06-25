@@ -278,7 +278,6 @@ Không commit `.env`, database, model tải về, cache hoặc dữ liệu trong
 - **duytienkaka** — phát triển và duy trì dự án
   GitHub: [@duytienkaka](https://github.com/duytienkaka)
 
-Danh sách contributor được xác định từ lịch sử Git. Khi có thêm thành viên đóng góp đáng kể, hãy bổ sung họ vào mục này.
 
 ## Nguồn và lời cảm ơn
 
@@ -305,4 +304,3 @@ Vui lòng dùng GitHub Issues cho báo lỗi, đề xuất tính năng hoặc th
 
 Repository hiện chưa có file `LICENSE`, vì vậy chưa có giấy phép nguồn mở nào được công bố. Theo mặc định, tác giả giữ toàn bộ quyền đối với mã nguồn.
 
-Nếu dự án cần được sử dụng, phân phối hoặc tích hợp bên ngoài phạm vi nhóm, hãy liên hệ tác giả và bổ sung giấy phép phù hợp. Có thể tham khảo [Choose a License](https://choosealicense.com/) hoặc [Open Source Initiative](https://opensource.org/licenses).
