@@ -275,9 +275,11 @@ Không commit `.env`, database, model tải về, cache hoặc dữ liệu trong
 
 ## Tác giả và contributors
 
-- **duytienkaka** — phát triển và duy trì dự án
-  GitHub: [@duytienkaka](https://github.com/duytienkaka)
-
+| Contributor | Vai trò | GitHub |
+| --- | --- | --- |
+| **duytienkaka** | Phát triển và duy trì chính | [@duytienkaka](https://github.com/duytienkaka) |
+| **Đức Tuấn Vương** | Contributor | [@ductuanvuong](https://github.com/ductuanvuong) |
+| **Văn Việt** | Contributor | [@DuongVanViet](https://github.com/DuongVanViet) |
 
 ## Nguồn và lời cảm ơn
 
